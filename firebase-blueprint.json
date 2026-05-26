@@ -1,0 +1,107 @@
+{
+  "entities": {
+    "FileEntry": {
+      "title": "FileEntry",
+      "description": "Metadata and content for an uploaded legal document",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "category": { "type": "string" },
+        "isUploaded": { "type": "boolean" },
+        "isArchived": { "type": "boolean" },
+        "timestamp": { "type": "number" },
+        "batchId": { "type": "string" },
+        "version": { "type": "string" },
+        "caseId": { "type": "string" },
+        "content": { "type": "string" },
+        "insight": { "type": "string" },
+        "indexStatus": { "type": "string", "enum": ["IDLE", "INDEXING", "DONE", "ERROR"] },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "name", "timestamp", "userId"]
+    },
+    "CaseRecord": {
+      "title": "CaseRecord",
+      "description": "Represents a legal case/spis",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "nr": { "type": "string" },
+        "activeVersion": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "name", "nr", "userId"]
+    },
+    "AuditTask": {
+      "title": "AuditTask",
+      "description": "A queued or completed audit task",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "files": { "type": "array", "items": { "type": "string" } },
+        "supportFiles": { "type": "array", "items": { "type": "string" } },
+        "pillars": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["pending", "processing", "done"] },
+        "timestamp": { "type": "number" },
+        "result": { "type": "string" },
+        "isNotified": { "type": "boolean" },
+        "version": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "files", "status", "timestamp", "userId"]
+    },
+    "VersionRecord": {
+      "title": "VersionRecord",
+      "description": "A snapshot of a version's state",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "version": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "selectedFiles": { "type": "array", "items": { "type": "string" } },
+        "selectedPillars": { "type": "array", "items": { "type": "string" } },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "version", "timestamp", "userId"]
+    },
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "User specific application settings",
+      "type": "object",
+      "properties": {
+        "currentCaseId": { "type": "string" },
+        "currentVersion": { "type": "string" },
+        "queueStrategy": { "type": "string" },
+        "gitContext": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["userId"]
+    }
+  },
+  "firestore": {
+    "users/{userId}/files/{fileId}": {
+      "schema": "FileEntry",
+      "description": "Uploaded documents for a user"
+    },
+    "users/{userId}/cases/{caseId}": {
+      "schema": "CaseRecord",
+      "description": "Legal cases for a user"
+    },
+    "users/{userId}/queue/{taskId}": {
+      "schema": "AuditTask",
+      "description": "Audit queue tasks for a user"
+    },
+    "users/{userId}/history/{historyId}": {
+      "schema": "VersionRecord",
+      "description": "Version history snapshots for a user"
+    },
+    "users/{userId}/settings/current": {
+      "schema": "UserSettings",
+      "description": "Current app state for a user"
+    }
+  }
+}

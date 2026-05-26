@@ -1,0 +1,126 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitives & Helpers ---
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Entity Validations ---
+
+    function isValidFileEntry(data) {
+      return data.keys().hasAll(['id', 'name', 'timestamp', 'userId']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() <= 256 &&
+             data.timestamp is number &&
+             data.userId == request.auth.uid &&
+             (data.get('content', '') is string && data.get('content', '').size() <= 1048576) &&
+             (data.get('category', 'OTHER') is string) &&
+             (data.get('indexStatus', 'IDLE') in ['IDLE', 'INDEXING', 'DONE', 'ERROR']);
+    }
+
+    function isValidCaseRecord(data) {
+      return data.keys().hasAll(['id', 'name', 'nr', 'userId']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() <= 256 &&
+             data.nr is string && data.nr.size() <= 64 &&
+             data.userId == request.auth.uid;
+    }
+
+    function isValidAuditTask(data) {
+      return data.keys().hasAll(['id', 'files', 'status', 'timestamp', 'userId']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.files is list && data.files.size() <= 100 &&
+             data.status in ['pending', 'processing', 'done', 'error'] &&
+             data.timestamp is number &&
+             data.userId == request.auth.uid;
+    }
+
+    function isValidVersionRecord(data) {
+      return data.keys().hasAll(['id', 'version', 'timestamp', 'userId']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.version is string && data.version.size() <= 64 &&
+             data.timestamp is number &&
+             data.userId == request.auth.uid;
+    }
+
+    function isValidUserSettings(data) {
+      return data.keys().hasAll(['userId']) &&
+             data.userId == request.auth.uid;
+    }
+
+    // --- Collection Routes ---
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      
+      match /files/{fileId} {
+        allow get: if isOwner(userId) && isValidId(fileId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(fileId) && isValidFileEntry(incoming());
+        allow update: if isOwner(userId) && isValidFileEntry(incoming()) && (
+          incoming().diff(existing()).affectedKeys().hasAny(['isArchived', 'category', 'insight', 'indexStatus', 'content', 'githubPath', 'driveId'])
+        );
+        allow delete: if isOwner(userId);
+      }
+
+      match /cases/{caseId} {
+        allow get: if isOwner(userId) && isValidId(caseId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(caseId) && isValidCaseRecord(incoming());
+        allow update: if isOwner(userId) && isValidCaseRecord(incoming()) && (
+          incoming().diff(existing()).affectedKeys().hasAny(['name', 'nr', 'activeVersion'])
+        );
+        allow delete: if isOwner(userId);
+      }
+
+      match /queue/{taskId} {
+        allow get: if isOwner(userId) && isValidId(taskId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(taskId) && isValidAuditTask(incoming());
+        allow update: if isOwner(userId) && isValidAuditTask(incoming()) && (
+          incoming().diff(existing()).affectedKeys().hasAny(['status', 'result', 'isNotified', 'error', 'timestamp'])
+        );
+        allow delete: if isOwner(userId);
+      }
+
+      match /history/{historyId} {
+        allow get: if isOwner(userId) && isValidId(historyId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(historyId) && isValidVersionRecord(incoming());
+        allow update: if isOwner(userId) && isValidVersionRecord(incoming()) && (
+          incoming().diff(existing()).affectedKeys().hasAny(['text', 'selectedFiles', 'selectedPillars', 'timestamp', 'version'])
+        );
+        allow delete: if isOwner(userId);
+      }
+
+      match /settings/current {
+        allow get: if isOwner(userId);
+        allow write: if isOwner(userId) && isValidUserSettings(incoming());
+      }
+    }
+  }
+}
